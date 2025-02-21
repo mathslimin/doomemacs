@@ -1,7 +1,7 @@
 ;; -*- no-byte-compile: t; -*-
 ;;; editor/word-wrap/packages.el
 
-(package! adaptive-wrap :pin "70005d2012ab57c20be03c05aebd49318fe49c99")
+(package! adaptive-wrap :pin "d75665b9c88e65f91dadd1e5880905bbdb7c09b7")
 (package! visual-fill-column
   :recipe (:host github :repo "emacsmirror/visual-fill-column")
-  :pin "5e74afe39d0afb911dae51af4e7a60ccdf9701f3")
+  :pin "11575df4e042f3263db62de0e8ee4f2331fbb1b4")

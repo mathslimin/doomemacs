@@ -65,7 +65,7 @@ default/fallback account."
       ;; as otherwise you can accumulate empty workspaces
       (progn
         (unless (+workspace-buffer-list)
-          (+workspace-delete (+workspace-current-name)))
+          (+workspace-kill (+workspace-current-name)))
         (+workspace-switch +mu4e-workspace-name t))
     (setq +mu4e--old-wconf (current-window-configuration))
     (delete-other-windows)
@@ -225,7 +225,7 @@ is tomorrow.  With two prefixes, select the deadline."
           (when (re-search-forward sec nil t)
             (let (org-M-RET-may-split-line
                   (lev (org-outline-level))
-                  (folded-p (invisible-p (point-at-eol)))
+                  (folded-p (invisible-p (line-end-position)))
                   (from (plist-get msg :from)))
               (when (consp (car from)) ; Occurs when using mu4e 1.8+.
                 (setq from (car from)))
@@ -281,7 +281,6 @@ attach a file, or select a folder to open dired in and select file attachments
 When otherwise called, open a dired buffer and enable `dired-mu4e-attach-ctrl-c-ctrl-c'."
   ;; TODO add ability to attach files (+dirs) as a single (named) archive
   (interactive "p")
-  (+mu4e-compose-org-msg-handle-toggle (/= 1 files-to-attach))
   (pcase major-mode
     ((or 'mu4e-compose-mode 'org-msg-edit-mode)
      (let ((mail-buffer (current-buffer))
@@ -312,7 +311,7 @@ When otherwise called, open a dired buffer and enable `dired-mu4e-attach-ctrl-c-
          (progn
            (message "No files marked, aborting.")
            (kill-buffer-and-window))
-       (if-let ((mail-target-buffer (bound-and-true-p dired-mail-buffer)))
+       (if-let* ((mail-target-buffer (bound-and-true-p dired-mail-buffer)))
            (progn (kill-buffer-and-window)
                   (switch-to-buffer mail-target-buffer))
          (if (and (+mu4e-current-buffers)
@@ -365,7 +364,7 @@ When otherwise called, open a dired buffer and enable `dired-mu4e-attach-ctrl-c-
   ;; (prolusion-mail-hide)
   (cond
    ((and (modulep! :ui workspaces) (+workspace-exists-p +mu4e-workspace-name))
-    (+workspace/delete +mu4e-workspace-name))
+    (+workspace/kill +mu4e-workspace-name))
 
    (+mu4e--old-wconf
     (set-window-configuration +mu4e--old-wconf)

@@ -41,4 +41,19 @@
 ;; http://www.culater.net/software/SIMBL/SIMBL.php and
 ;; https://github.com/saitoha/mouseterm-plus/releases. That makes to support
 ;; VT's DECSCUSR sequence.
-(add-hook 'tty-setup-hook #'evil-terminal-cursor-changer-activate)
+(use-package! evil-terminal-cursor-changer
+  :hook (tty-setup . evil-terminal-cursor-changer-activate))
+
+;; Add support for the Kitty keyboard protocol.
+(use-package! kkp
+  :hook (after-init . global-kkp-mode)
+  :config
+  ;; HACK: Allow C-i to function independently of TAB in KKP-supported
+  ;;   terminals. Requires the `input-decode-map' entry in
+  ;;   lisp/doom-keybinds.el.
+  (define-key! key-translation-map
+    [?\C-i] (cmd! (if-let* (((kkp--this-terminal-has-active-kkp-p))
+                            (keys (this-single-command-raw-keys))
+                            ((> (length keys) 2))
+                            ((equal (cl-subseq keys -3) [27 91 49])))
+                      [C-i] [?\C-i]))))

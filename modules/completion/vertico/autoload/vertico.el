@@ -211,15 +211,15 @@ targets."
 ;;;###autoload
 (defun +vertico/consult-fd-or-find (&optional dir initial)
   "Runs consult-fd if fd version > 8.6.0 exists, consult-find otherwise.
-See URL `https://github.com/minad/consult/issues/770'."
+See minad/consult#770."
   (interactive "P")
   ;; TODO this condition was adapted from a similar one in lisp/doom-projects.el, to be replaced with a more robust check post v3
   (if (when-let*
           ((bin (if (ignore-errors (file-remote-p default-directory nil t))
                     (cl-find-if (doom-rpartial #'executable-find t)
                                 (list "fdfind" "fd"))
-                  doom-projectile-fd-binary))
-           (version (with-memoization doom-projects--fd-version
+                  doom-fd-executable))
+           (version (with-memoization (get 'doom-fd-executable 'version)
                       (cadr (split-string (cdr (doom-call-process bin "--version"))
                                           " " t))))
            ((ignore-errors (version-to-list version))))
@@ -237,3 +237,27 @@ See URL `https://github.com/minad/consult/issues/770'."
 (defun +vertico-basic-remote-all-completions (string table pred point)
   (and (vertico--remote-p string)
        (completion-basic-all-completions string table pred point)))
+
+;;;###autoload
+(defun +vertico-orderless-dispatch (pattern _index _total)
+  "Like `orderless-affix-dispatch', but allows affixes to be escaped."
+  (let ((len (length pattern))
+        (alist orderless-affix-dispatch-alist))
+    (when (> len 0)
+      (cond
+       ;; Ignore single dispatcher character
+       ((and (= len 1) (alist-get (aref pattern 0) alist)) #'ignore)
+       ;; Prefix
+       ((when-let ((style (alist-get (aref pattern 0) alist))
+                   ((not (char-equal (aref pattern (max (1- len) 1)) ?\\))))
+          (cons style (substring pattern 1))))
+       ;; Suffix
+       ((when-let ((style (alist-get (aref pattern (1- len)) alist))
+                   ((not (char-equal (aref pattern (max 0 (- len 2))) ?\\))))
+          (cons style (substring pattern 0 -1))))))))
+
+;;;###autoload
+(defun +vertico-orderless-disambiguation-dispatch (pattern _index _total)
+  "Ensure $ works with Consult commands, which add disambiguation suffixes."
+  (when (char-equal (aref pattern (1- (length pattern))) ?$)
+    `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$"))))

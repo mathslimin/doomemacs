@@ -1,7 +1,7 @@
 ;; -*- no-byte-compile: t; -*-
 ;;; lang/java/packages.el
 
-(package! android-mode :pin "d5332e339a1f5e30559a53feffb8442ca79265d6")
+(package! android-mode :pin "67f7c0d7d37605efc7f055b76d731556861c3eb9")
 (package! groovy-mode :pin "7b8520b2e2d3ab1d62b35c426e17ac25ed0120bb")
 
 (when (modulep! +meghanada)
@@ -19,5 +19,5 @@
     ;;   enabled (i.e. lsp-treemacs isn't installed). This needs to be tackled
     ;;   upstream, but for now:
     (unless (alist-get 'lsp-treemacs doom-packages)
-      (package! lsp-treemacs :pin "e54e74deb8150964e3c3024e1ec14295a34e2a3b"))
-    (package! lsp-java :pin "c962a3b3ac2beabdf1ce83b815396d6c38e3cefa")))
+      (package! lsp-treemacs :pin "fb1a07ae0a3d781dea8ac78da2933e0173eb48a4"))
+    (package! lsp-java :pin "868600bf7f47faefe0e5971060dc6e73026cda38")))

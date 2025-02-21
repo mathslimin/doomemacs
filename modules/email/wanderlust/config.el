@@ -50,11 +50,13 @@
           "^List-.*:"
           "^Received-SPF:"
           "^DKIM-.*:"
-          "^DomainKey-Signature:"
+          "^DomainKey-.*:"
           "^SPF-.*:"
           "^Autocrypt:"
           "^ARC-.*:"
-          "^Authentication-Results:")
+          "^Authentication-Results:"
+          "^UI-.*:"
+          "^IronPort.*:")
         wl-message-visible-field-list
         '("^Message-Id:"
           "^User-Agent:"
@@ -84,6 +86,13 @@
 
     (setq wl-message-id-domain wl-local-domain))
 
+  ;; We're living in the world where UTF-8 is de facto default charset.
+  (setq-default mime-charset-for-write 'utf-8)
+  (setq-default mime-transfer-level 8)
+  (setq charsets-mime-charset-alist
+        '(((ascii) . us-ascii)
+          ((unicode) . utf-8)))
+
   ;; Use x-face only when compface installed
   (when (modulep! +xface)
     (autoload 'x-face-decode-message-header "x-face-e21")
@@ -99,7 +108,7 @@
     ;; In addition, `wl-folder-mode' won't start in `evil-emacs-state' through
     ;; `evil-emacs-state-modes', and `wl-summary-mode' won't start in
     ;; `evil-emacs-state' through `wl-summary-mode-hook'.
-    (add-hook! 'wl-folder-mode-hook #'evil-emacs-state)
+    (add-hook 'wl-folder-mode-hook #'evil-emacs-state)
     (pushnew! evil-emacs-state-modes 'wl-summary-mode))
 
   (add-hook 'mime-edit-mode-hook #'auto-fill-mode))

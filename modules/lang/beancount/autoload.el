@@ -120,11 +120,13 @@ If REVERSE (the prefix arg) is non-nil, sort the transactions in reverst order."
 
 (defvar compilation-read-command)
 ;;;###autoload
-(defun +beancount/balance ()
+(defun +beancount/balance (&optional all-accounts)
   "Display a balance report with bean-report (bean-report bal)."
-  (interactive)
-  (let (compilation-read-command)
-    (beancount--run "bean-report" buffer-file-name "bal")))
+  (interactive "P")
+  (let ((args (unless all-accounts '("-e" "Assets|Liabilities")))
+        compilation-read-command
+        current-prefix-arg)
+    (apply #'beancount--run "bean-report" buffer-file-name "balances" args)))
 
 ;;;###autoload
 (defun +beancount/clone-transaction ()
@@ -195,7 +197,7 @@ If DISABLE? (universal arg), reveal hidden accounts without prompting."
               (seq-let (beg end) (beancount-find-transaction-extents (point))
                 ;; TODO: Highlight entry (ala org-occur)
                 (if (= beg end)
-                    (setq end (save-excursion (goto-char end) (1+ (eol)))))
+                    (setq end (save-excursion (goto-char end) (1+ (pos-eol)))))
                 (put-text-property start beg 'invisible t)
                 (put-text-property start beg 'display placeholder)
                 (setq start end))))
@@ -226,7 +228,7 @@ Return non-nil if successful."
           ;; Ensures "jump to top of current transaction" behavior that is
           ;; common for jump-to-previous commands like this in other Emacs modes
           ;; (like org-mode).
-          (or (bolp) (goto-char (eol)))
+          (or (bolp) (goto-char (pos-eol)))
           (re-search-backward
            (concat beancount-timestamped-directive-regexp
                    "\\|" beancount-transaction-regexp)))

@@ -23,6 +23,20 @@
   ;; Display errors a little quicker (default is 0.9s)
   (setq flycheck-display-errors-delay 0.25)
 
+  ;; HACK: Protect against eager expansion of `setf'. The gv setter won't be
+  ;;   available until after `flycheck' loads, but macro expand occurs when this
+  ;;   file is loaded.
+  (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
+               (lambda ()
+                 (and
+                  ;; Do not check buffers that ask not to be byte-compiled.
+                  (not (bound-and-true-p no-byte-compile))
+                  ;; Disable the emacs-lisp checker in non-project (likely
+                  ;; untrusted) buffers to mitigate potential code execution
+                  ;; vulnerability during macro expansion. See CVE-2024-53920.
+                  (doom-project-p))))
+        t)
+
   ;; Don't commandeer input focus if the error message pops up (happens when
   ;; tooltips and childframes are disabled).
   (set-popup-rules!
@@ -50,7 +64,7 @@
   :commands flycheck-popup-tip-show-popup flycheck-popup-tip-delete-popup
   :hook (flycheck-mode . +syntax-init-popups-h)
   :config
-  (setq flycheck-popup-tip-error-prefix "X ")
+  (setq flycheck-popup-tip-error-prefix (if (modulep! +icons) "⚠ " "[!] "))
 
   ;; HACK: Only display the flycheck popup if we're in normal mode (for evil
   ;;   users) or if no selection or completion is active. This popup can
@@ -71,9 +85,28 @@
   :unless (modulep! +flymake)
   :hook (flycheck-mode . +syntax-init-popups-h)
   :config
-  (setq flycheck-posframe-warning-prefix "! "
-        flycheck-posframe-info-prefix "··· "
-        flycheck-posframe-error-prefix "X ")
+  (if (modulep! +icons)
+      (setq flycheck-posframe-warning-prefix "⚠ "
+            flycheck-posframe-info-prefix "ⓘ "
+            flycheck-posframe-error-prefix "⮾ ")
+    (setq flycheck-posframe-warning-prefix "[?] "
+          flycheck-posframe-info-prefix "[i] "
+          flycheck-posframe-error-prefix "[!] "))
+
+  ;; HACK: Hide the flycheck posframe immediately on the next keypress/user
+  ;;   action, otherwise it lingers until the next time the user is idle.
+  (defun +syntax--flycheck-posframe-hide-h ()
+    (unless (flycheck-posframe-check-position)
+      (posframe-hide flycheck-posframe-buffer))
+    (remove-hook 'post-command-hook #'+syntax--flycheck-posframe-hide-h))
+
+  (defadvice! +syntax-hide-posframe-on-next-command-a (fn &rest args)
+    :around #'flycheck-posframe-show-posframe
+    (letf! ((defun posframe-show (&rest args)
+              (add-hook 'post-command-hook #'+syntax--flycheck-posframe-hide-h)
+              (apply posframe-show args)))
+      (apply fn args)))
+
   (after! company
     ;; Don't display popups if company is open
     (add-hook 'flycheck-posframe-inhibit-functions #'company--active-p))
@@ -92,7 +125,15 @@
   :when (modulep! +flymake)
   :hook ((prog-mode text-mode) . flymake-mode)
   :config
-  (setq flymake-fringe-indicator-position 'right-fringe))
+  (setq flymake-fringe-indicator-position 'right-fringe)
+
+  ;; HACK: Disable the emacs-lisp checker in non-project (likely untrusted)
+  ;;   buffers to mitigate potential code execution vulnerability during macro
+  ;;   expansion. See CVE-2024-53920.
+  (defadvice! +syntax--only-check-elisp-buffers-in-projects-a (fn &rest args)
+    "Prevent the elisp checker in non-project buffers (for CVE-2024-53920)."
+    :before-while #'elisp-flymake-byte-compile
+    (doom-project-p)))
 
 
 (use-package! flymake-popon

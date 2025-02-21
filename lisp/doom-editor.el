@@ -246,11 +246,8 @@ tell you about it. Very annoying. This prevents that."
 ;;
 ;;; Extra file extensions to support
 
-(nconc
- auto-mode-alist
- '(("/LICENSE\\'" . text-mode)
-   ("\\.log\\'" . text-mode)
-   ("rc\\'" . conf-mode)))
+(add-to-list 'auto-mode-alist '("/LICENSE\\'" . text-mode))
+(add-to-list 'auto-mode-alist '("rc\\'" . conf-mode) 'append)
 
 
 ;;
@@ -450,6 +447,8 @@ files, so this replace calls to `pp' with the much faster `prin1'."
   ;; REVIEW Suppress byte-compiler warning spawning a *Compile-Log* buffer at
   ;; startup. This can be removed once gilbertw1/better-jumper#2 is merged.
   (defvar better-jumper-local-mode nil)
+  ;; REVIEW: Remove if/when gilbertw1/better-jumper#26 is addressed.
+  (defvaralias 'evil--jumps-jump-command 'evil--jumps-jumping-backward)
   :init
   (global-set-key [remap evil-jump-forward]  #'better-jumper-jump-forward)
   (global-set-key [remap evil-jump-backward] #'better-jumper-jump-backward)
@@ -484,7 +483,8 @@ files, so this replace calls to `pp' with the much faster `prin1'."
 
   (defun doom-set-jump-h ()
     "Run `better-jumper-set-jump' but return nil, for short-circuiting hooks."
-    (better-jumper-set-jump)
+    (when (get-buffer-window)
+      (better-jumper-set-jump))
     nil)
 
   ;; Creates a jump point before killing a buffer. This allows you to undo
@@ -493,7 +493,7 @@ files, so this replace calls to `pp' with the much faster `prin1'."
   ;;
   ;; I'm not advising `kill-buffer' because I only want this to affect
   ;; interactively killed buffers.
-  (advice-add #'kill-current-buffer :around #'doom-set-jump-a)
+  (add-hook 'kill-buffer-hook #'doom-set-jump-h)
 
   ;; Create a jump point before jumping with imenu.
   (advice-add #'imenu :around #'doom-set-jump-a))
@@ -542,61 +542,6 @@ files, so this replace calls to `pp' with the much faster `prin1'."
                          (message ""))))) ; warn silently
         (funcall fn arg)))))
 
-(use-package! helpful
-  ;; a better *help* buffer
-  :commands helpful--read-symbol
-  :hook (helpful-mode . visual-line-mode)
-  :init
-  ;; Make `apropos' et co search more extensively. They're more useful this way.
-  (setq apropos-do-all t)
-
-  (global-set-key [remap describe-function] #'helpful-callable)
-  (global-set-key [remap describe-command]  #'helpful-command)
-  (global-set-key [remap describe-variable] #'helpful-variable)
-  (global-set-key [remap describe-key]      #'helpful-key)
-  (global-set-key [remap describe-symbol]   #'helpful-symbol)
-
-  (defun doom-use-helpful-a (fn &rest args)
-    "Force FN to use helpful instead of the old describe-* commands."
-    (letf! ((#'describe-function #'helpful-function)
-            (#'describe-variable #'helpful-variable))
-      (apply fn args)))
-
-  (after! apropos
-    ;; patch apropos buttons to call helpful instead of help
-    (dolist (fun-bt '(apropos-function apropos-macro apropos-command))
-      (button-type-put
-       fun-bt 'action
-       (lambda (button)
-         (helpful-callable (button-get button 'apropos-symbol)))))
-    (dolist (var-bt '(apropos-variable apropos-user-option))
-      (button-type-put
-       var-bt 'action
-       (lambda (button)
-         (helpful-variable (button-get button 'apropos-symbol))))))
-
-  (when (> emacs-major-version 28)
-    ;; REVIEW This should be reported upstream to Emacs.
-    (defadvice! doom--find-function-search-for-symbol-save-excursion-a (fn &rest args)
-      "Suppress cursor movement by `find-function-search-for-symbol'.
-
-Addresses an unwanted side-effect in `find-function-search-for-symbol' on Emacs
-29 where the cursor is moved to a variable's definition if it's defined in the
-current buffer."
-      :around #'find-function-search-for-symbol
-      (let (buf pos)
-        (letf! (defun find-library-name (library)
-                 (let ((filename (funcall find-library-name library)))
-                   (with-current-buffer (find-file-noselect filename)
-                     (setq buf (current-buffer)
-                           pos (point)))
-                   filename))
-          (prog1 (apply fn args)
-            (when (buffer-live-p buf)
-              (with-current-buffer buf (goto-char pos))))))))
-  :config
-  (setq helpful-set-variable-function #'setq!))
-
 
 (use-package! smartparens
   ;; Auto-close delimiters and blocks as you type. It's more powerful than that,
@@ -604,8 +549,6 @@ current buffer."
   :hook (doom-first-buffer . smartparens-global-mode)
   :commands sp-pair sp-local-pair sp-with-modes sp-point-in-comment sp-point-in-string
   :config
-  (add-to-list 'doom-point-in-string-functions 'sp-point-in-string)
-  (add-to-list 'doom-point-in-comment-functions 'sp-point-in-comment)
   ;; smartparens recognizes `slime-mrepl-mode', but not `sly-mrepl-mode', so...
   (add-to-list 'sp-lisp-modes 'sly-mrepl-mode)
   ;; Load default smartparens rules for various languages
@@ -730,11 +673,12 @@ on."
   ;; a less intrusive `delete-trailing-whitespaces' on save
   :hook (doom-first-buffer . ws-butler-global-mode)
   :config
-  ;; ws-butler normally preserves whitespace in the buffer (but strips it from
-  ;; the written file). While sometimes convenient, this behavior is not
-  ;; intuitive. To the average user it looks like whitespace cleanup is failing,
-  ;; which causes folks to redundantly install their own.
-  (setq ws-butler-keep-whitespace-before-point nil))
+  (pushnew! ws-butler-global-exempt-modes
+            'special-mode
+            'comint-mode
+            'term-mode
+            'eshell-mode
+            'diff-mode))
 
 (provide 'doom-editor)
 ;;; doom-editor.el ends here

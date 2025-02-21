@@ -8,7 +8,8 @@
           lisp-mode
           racket-mode
           fennel-mode
-          hy-mode) . parinfer-rust-mode)
+          hy-mode
+          dune-mode) . parinfer-rust-mode)
   :init
   (setq parinfer-rust-library
         (file-name-concat
@@ -17,7 +18,8 @@
                ((featurep :system 'linux)   "parinfer-rust-linux.so")
                ((featurep :system 'windows) "parinfer-rust-windows.dll")
                ((featurep :system 'bsd)     "libparinfer_rust.so")))
-        parinfer-rust-auto-download (not (featurep :system 'bsd)))
+        parinfer-rust-auto-download (not (featurep :system 'bsd))
+        parinfer-rust-disable-troublesome-modes t)
   :config
   (map! :map parinfer-rust-mode-map
         :localleader

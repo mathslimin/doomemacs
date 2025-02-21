@@ -14,13 +14,10 @@
   :mode ("\\.bats\\'" . sh-mode)
   :mode ("\\.\\(?:zunit\\|env\\)\\'" . sh-mode)
   :mode ("/bspwmrc\\'" . sh-mode)
+  :magic ("#compdef " . sh-mode)
   :config
   (set-docsets! 'sh-mode "Bash")
   (set-electric! 'sh-mode :words '("else" "elif" "fi" "done" "then" "do" "esac" ";;"))
-  (set-formatter! 'shfmt '("shfmt" "-ci"
-                           (unless indent-tabs-mode
-                             (list "-i" (number-to-string tab-width)))))
-
   (set-repl-handler! 'sh-mode #'+sh/open-repl)
   (set-lookup-handlers! 'sh-mode :documentation #'+sh-lookup-documentation-handler)
   (set-ligatures! 'sh-mode
@@ -46,7 +43,7 @@
   (setq sh-indent-after-continuation 'always)
 
   ;; [pedantry intensifies]
-  (setq-hook! 'sh-mode-hook mode-name "sh")
+  (setq-hook! 'sh-mode-local-vars-hook mode-name "Sh")
 
   ;; recognize function names with dashes in them
   (add-to-list 'sh-imenu-generic-expression

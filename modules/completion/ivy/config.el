@@ -211,10 +211,20 @@ results buffer.")
   (when (stringp counsel-rg-base-command)
     (setq counsel-rg-base-command (split-string counsel-rg-base-command)))
 
-  ;; Integrate with `helpful'
-  (setq counsel-describe-function-function #'helpful-callable
-        counsel-describe-variable-function #'helpful-variable
-        counsel-descbinds-function #'helpful-callable)
+  ;; REVIEW: See abo-abo/swiper#2339.
+  (defadvice! +counsel-rg-suppress-error-code-a (fn &rest args)
+    "Ripgrep returns a non-zero exit code if it encounters any trouble (e.g. you
+don't have the needed permissions for a couple files/directories in a project).
+Even if rg continues to produce workable results, that non-zero exit code causes
+counsel-rg to discard the rest of the output to display an error.
+
+This advice suppresses the error code, so you can still operate on whatever
+workable results ripgrep produces, despite the error."
+    :around #'counsel-rg
+    (letf! (defun process-exit-status (proc)
+             (let ((code (funcall process-exit-status proc)))
+               (if (= code 2) 0 code)))
+      (apply fn args)))
 
   ;; Decorate `doom/help-custom-variable' results the same way as
   ;; `counsel-describe-variable' (adds value and docstring columns).
@@ -271,7 +281,7 @@ results buffer.")
     "Change `counsel-file-jump' to use fd or ripgrep, if they are available."
     :override #'counsel--find-return-list
     (cl-destructuring-bind (find-program . args)
-        (cond ((when-let (fd (executable-find (or doom-projectile-fd-binary "fd") t))
+        (cond ((when-let (fd (executable-find (or doom-fd-executable "fd") t))
                  (append (list fd "--hidden" "--type" "file" "--type" "symlink" "--follow" "--color=never")
                          (cl-loop for dir in projectile-globally-ignored-directories
                                   collect "--exclude"
@@ -356,7 +366,7 @@ results buffer.")
   :when (modulep! +fuzzy)
   :unless (modulep! +prescient)
   :defer t  ; is loaded by ivy
-  :preface (when (or (not (modulep! +fuzzy))
+  :preface (when (or (modulep! -fuzzy)
                      (modulep! +prescient))
              (setq ivy--flx-featurep nil))
   :init (setq ivy-flx-limit 10000))

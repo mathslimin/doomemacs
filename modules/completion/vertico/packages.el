@@ -1,24 +1,23 @@
 ;; -*- no-byte-compile: t; -*-
 ;;; completion/vertico/packages.el
 
-(package! vertico :pin "68e51fda552a2f91caab69e83564bc91275b09b1")
+(package! vertico :pin "c682ef50e62237435e9fc287927ce4181b49be90")
 
-(package! orderless :pin "ac4aeb66f331f4c4a430d5556071e33177304c37")
+(package! orderless :pin "49d1fdfb80b55699a00b11bc916ad29c0447039b")
 
-(package! consult :pin "c87b0bf06de0c3cb60bc8d257c770cb981ddcd19")
-(package! consult-dir :pin "3f5f4b71ebe819392cb090cda71bd39a93bd830a")
-(when (and (modulep! :checkers syntax)
-           (not (modulep! :checkers syntax +flymake)))
-  (package! consult-flycheck :pin "754f5497d827f7d58009256a21af614cc44378a3"))
-(package! embark :pin "d3c9d1b4c890cf365846cc2b418f37341999e79f")
-(package! embark-consult :pin "d3c9d1b4c890cf365846cc2b418f37341999e79f")
+(package! consult :pin "0c3f53916ea0db0c472c0a0c620a85cc1b00caf2")
+(package! consult-dir :pin "15891383f34d43acc5bb82bda92239b1f54cf178")
+(when (modulep! :checkers syntax -flymake)
+  (package! consult-flycheck :pin "3b999ae983900c16c0b5b5c30b7eca640d386a76"))
+(package! embark :pin "19a13e344e04bbf861eaa74491b23da52b398672")
+(package! embark-consult :pin "19a13e344e04bbf861eaa74491b23da52b398672")
 
-(package! marginalia :pin "3275d1f85cb020280979a050054b843f7563aea2")
+(package! marginalia :pin "50a51c69f006ec8b3ba1c570555d279d4cff6d99")
 
 (package! wgrep :pin "208b9d01cfffa71037527e3a324684b3ce45ddc4")
 
 (when (modulep! +icons)
-  (package! nerd-icons-completion :pin "c2db8557a3c1a9588d111f8c8e91cae96ee85010"))
+  (package! nerd-icons-completion :pin "426a1d7c29a04ae8e6ae9b55b0559f11a1e8b420"))
 
 (when (modulep! +childframe)
   (package! vertico-posframe

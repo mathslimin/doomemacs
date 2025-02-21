@@ -74,30 +74,18 @@ orderless."
           (completion-styles +vertico-company-completion-styles))
       (apply fn args)))
 
-  (defun +vertico-orderless-dispatch (pattern _index _total)
-    (cond
-     ;; Ensure $ works with Consult commands, which add disambiguation suffixes
-     ((string-suffix-p "$" pattern)
-      `(orderless-regexp . ,(concat (substring pattern 0 -1) "[\x200000-\x300000]*$")))
-     ;; Ignore single !
-     ((string= "!" pattern) `(orderless-literal . ""))
-     ;; Without literal
-     ((string-prefix-p "!" pattern) `(orderless-without-literal . ,(substring pattern 1)))
-     ;; Annotation
-     ((string-prefix-p "&" pattern) `(orderless-annotation . ,(substring pattern 1)))
-     ((string-suffix-p "&" pattern) `(orderless-annotation . ,(substring pattern 0 -1)))
-     ;; Character folding
-     ((string-prefix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 1)))
-     ((string-suffix-p "%" pattern) `(char-fold-to-regexp . ,(substring pattern 0 -1)))
-     ;; Initialism matching
-     ((string-prefix-p "`" pattern) `(orderless-initialism . ,(substring pattern 1)))
-     ((string-suffix-p "`" pattern) `(orderless-initialism . ,(substring pattern 0 -1)))
-     ;; Literal matching
-     ((string-prefix-p "=" pattern) `(orderless-literal . ,(substring pattern 1)))
-     ((string-suffix-p "=" pattern) `(orderless-literal . ,(substring pattern 0 -1)))
-     ;; Flex matching
-     ((string-prefix-p "~" pattern) `(orderless-flex . ,(substring pattern 1)))
-     ((string-suffix-p "~" pattern) `(orderless-flex . ,(substring pattern 0 -1)))))
+  (setq orderless-affix-dispatch-alist
+        '((?! . orderless-without-literal)
+          (?& . orderless-annotation)
+          (?% . char-fold-to-regexp)
+          (?` . orderless-initialism)
+          (?= . orderless-literal)
+          (?^ . orderless-literal-prefix)
+          (?~ . orderless-flex))
+        orderless-style-dispatchers
+        '(+vertico-orderless-dispatch
+          +vertico-orderless-disambiguation-dispatch))
+
   (add-to-list
    'completion-styles-alist
    '(+vertico-basic-remote
@@ -109,7 +97,6 @@ orderless."
         ;; note that despite override in the name orderless can still be used in
         ;; find-file etc.
         completion-category-overrides '((file (styles +vertico-basic-remote orderless partial-completion)))
-        orderless-style-dispatchers '(+vertico-orderless-dispatch)
         orderless-component-separator #'orderless-escapable-split-on-space)
   ;; ...otherwise find-file gets different highlighting than other commands
   (set-face-attribute 'completions-first-difference nil :inherit nil))
@@ -128,7 +115,6 @@ orderless."
     [remap Info-search]                   #'consult-info
     [remap locate]                        #'consult-locate
     [remap load-theme]                    #'consult-theme
-    [remap man]                           #'consult-man
     [remap recentf-open-files]            #'consult-recent-file
     [remap switch-to-buffer]              #'consult-buffer
     [remap switch-to-buffer-other-window] #'consult-buffer-other-window
@@ -141,6 +127,15 @@ orderless."
 `consult-buffer' needs `recentf-mode' to show file candidates."
     :before (list #'consult-recent-file #'consult-buffer)
     (recentf-mode +1))
+
+  (defadvice! +vertico--use-evil-registers-a (fn &rest args)
+    "Use `evil-register-list' if `evil-mode' is active."
+    :around #'consult-register--alist
+    (let ((register-alist
+           (if (bound-and-true-p evil-local-mode)
+               (evil-register-list)
+             register-alist)))
+      (apply fn args)))
 
   (setq consult-project-function #'doom-project-root
         consult-narrow-key "<"
@@ -209,7 +204,7 @@ orderless."
          "C-x C-d" #'consult-dir
          "C-x C-j" #'consult-dir-jump-file))
   :config
-  ;; DEPRECATED: Remove when Doom core replaces projectile with project.el
+  ;; DEPRECATED: Remove when projectile is replaced with project.el
   (setq consult-dir-project-list-function #'consult-dir-projectile-dirs)
 
   (when (modulep! :tools docker)
@@ -257,8 +252,7 @@ orderless."
   (add-to-list 'consult-dir-sources 'consult-dir--source-tramp-local t))
 
 (use-package! consult-flycheck
-  :when (and (modulep! :checkers syntax)
-             (not (modulep! :checkers syntax +flymake)))
+  :when (modulep! :checkers syntax -flymake)
   :after (consult flycheck))
 
 (use-package! consult-yasnippet

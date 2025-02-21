@@ -4,22 +4,12 @@
   :commands eglot eglot-ensure
   :hook (eglot-managed-mode . +lsp-optimization-mode)
   :init
-  (defadvice! +eglot--ensure-available-mode-a (fn)
-    "Run `eglot-ensure' if the current mode has support."
-    :around #'eglot-ensure
-    (when (alist-get major-mode eglot-server-programs nil nil
-                     (lambda (modes key)
-                       (if (listp modes)
-                           (member key modes)
-                         (eq key modes))))
-      (funcall fn)))
   (setq eglot-sync-connect 1
         eglot-autoshutdown t
         ;; NOTE: We disable eglot-auto-display-help-buffer because :select t in
         ;;   its popup rule causes eglot to steal focus too often.
         eglot-auto-display-help-buffer nil)
-  (when (and (modulep! :checkers syntax)
-             (not (modulep! :checkers syntax +flymake)))
+  (when (modulep! :checkers syntax -flymake)
     (setq eglot-stay-out-of '(flymake)))
 
   :config
@@ -62,13 +52,14 @@ server an expensive restart when its buffer is reverted."
 
 
 (use-package! consult-eglot
-  :defer t
   :when (modulep! :completion vertico)
+  :defer t
   :init
-  (map! :map eglot-mode-map [remap xref-find-apropos] #'consult-eglot-symbols))
+  (map! :after eglot
+        :map eglot-mode-map
+        [remap xref-find-apropos] #'consult-eglot-symbols))
 
 
 (use-package! flycheck-eglot
-  :when (and (modulep! :checkers syntax)
-             (not (modulep! :checkers syntax +flymake)))
+  :when (modulep! :checkers syntax -flymake)
   :hook (eglot-managed-mode . flycheck-eglot-mode))

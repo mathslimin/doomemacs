@@ -38,42 +38,70 @@
 ;;; Global keybindings
 
 ;; Smart tab, these will only work in GUI Emacs
-(map! :i [tab] (cmds! (and (modulep! :editor snippets)
-                           (yas-maybe-expand-abbrev-key-filter 'yas-expand))
-                      #'yas-expand
-                      (and (bound-and-true-p company-mode)
-                           (modulep! :completion company +tng))
-                      #'company-indent-or-complete-common
-                      (and (bound-and-true-p corfu-mode)
-                           (modulep! :completion corfu))
-                      #'completion-at-point)
-      :m [tab] (cmds! (and (modulep! :editor snippets)
-                           (evil-visual-state-p)
-                           (or (eq evil-visual-selection 'line)
-                               (not (memq (char-after) (list ?\( ?\[ ?\{ ?\} ?\] ?\))))))
-                      #'yas-insert-snippet
-                      (and (modulep! :editor fold)
-                           (save-excursion (end-of-line) (invisible-p (point))))
-                      #'+fold/toggle
-                      ;; Fixes #4548: without this, this tab keybind overrides
-                      ;; mode-local ones for modes that don't have an evil
-                      ;; keybinding scheme or users who don't have :editor (evil
-                      ;; +everywhere) enabled.
-                      (or (doom-lookup-key
-                           [tab]
-                           (list (evil-get-auxiliary-keymap (current-local-map) evil-state)
-                                 (current-local-map)))
-                          (doom-lookup-key
-                           (kbd "TAB")
-                           (list (evil-get-auxiliary-keymap (current-local-map) evil-state)))
-                          (doom-lookup-key (kbd "TAB") (list (current-local-map))))
-                      it
-                      (fboundp 'evil-jump-item)
-                      #'evil-jump-item)
+(map! :i [tab]
+      `(menu-item "Evil insert smart tab" nil :filter
+        (lambda (cmd)
+          (cond
+           ((or (doom-lookup-key [tab] overriding-terminal-local-map)
+                (doom-lookup-key (kbd "TAB") overriding-terminal-local-map))
+            cmd)
+           ,@(when (modulep! :editor snippets)
+               '(((memq (bound-and-true-p yas--active-field-overlay)
+                        (overlays-in (1- (point)) (1+ (point))))
+                  #'yas-next-field-or-maybe-expand)
+                 ((and (bound-and-true-p yas-minor-mode)
+                       (yas-maybe-expand-abbrev-key-filter 'yas-expand))
+                  #'yas-expand)))
+           ,@(when (modulep! :completion company +tng)
+               '(((bound-and-true-p company-mode)
+                  #'company-indent-or-complete-common)))
+           ,@(when (modulep! :completion corfu)
+               '(((bound-and-true-p corfu-mode)
+                  (if (derived-mode-p 'eshell-mode 'comint-mode)
+                      #'completion-at-point
+                    #'indent-for-tab-command)))))))
+      :m [tab]
+      `(menu-item "Evil motion smart tab" nil :filter
+        (lambda (cmd)
+          (cond
+           ((or (doom-lookup-key [tab] overriding-terminal-local-map)
+                (doom-lookup-key (kbd "TAB") overriding-terminal-local-map))
+            cmd)
+           ,@(when (modulep! :editor snippets)
+               '(((and (evil-visual-state-p)
+                       (or (eq evil-visual-selection 'line)
+                           (not (memq (char-after)
+                                      (list ?\( ?\[ ?\{ ?\} ?\] ?\))))))
+                  #'yas-insert-snippet)))
+           ,@(when (modulep! :editor fold)
+               '(((save-excursion (end-of-line) (invisible-p (point)))
+                  #'+fold/toggle)))
+           ;; Fixes #4548: without this, this tab keybind overrides
+           ;; mode-local ones for modes that don't have an evil
+           ;; keybinding scheme or users who don't have :editor (evil
+           ;; +everywhere) enabled.
+           ((or (doom-lookup-key
+                 [tab]
+                 (list (evil-get-auxiliary-keymap (current-local-map)
+                                                  evil-state)
+                       (current-local-map)))
+                (doom-lookup-key
+                 (kbd "TAB")
+                 (list (evil-get-auxiliary-keymap (current-local-map)
+                                                  evil-state)))
+                (doom-lookup-key (kbd "TAB") (list (current-local-map))))
+            cmd)
+           ((fboundp 'evil-jump-item)
+            #'evil-jump-item))))
+      ;; Extend smart tab for specific modes. This way, we process the entire
+      ;; smart tab logic and only fall back to these commands at the end.
+      (:when (modulep! :lang org)
+       (:after org :map org-mode-map
+        [remap indent-for-tab-command]
+        `(menu-item "Go to the next field" org-table-next-field
+          :filter ,(lambda (cmd) (when (org-at-table-p) cmd)))))
 
       (:after help :map help-mode-map
-       :n "o"       #'link-hint-open-link)
-      (:after helpful :map helpful-mode-map
        :n "o"       #'link-hint-open-link)
       (:after info :map Info-mode-map
        :n "o"       #'link-hint-open-link)
@@ -90,9 +118,9 @@
        :n "o"    #'link-hint-open-link)
 
       (:unless (modulep! :input layout +bepo)
-        (:after (evil-org evil-easymotion)
-         :map evil-org-mode-map
-         :m "gsh" #'+org/goto-visible))
+       (:after (evil-org evil-easymotion)
+        :map evil-org-mode-map
+        :m "gsh" #'+org/goto-visible))
 
       (:when (modulep! :editor multiple-cursors)
        :prefix "gz"
@@ -132,8 +160,9 @@
 
 ;;; :completion (in-buffer)
 (map! (:when (modulep! :completion company)
-       :i "C-@"    (cmds! (not (minibufferp)) #'company-complete-common)
-       :i "C-SPC"  (cmds! (not (minibufferp)) #'company-complete-common)
+       (:unless (bound-and-true-p evil-disable-insert-state-bindings)
+        :i "C-@"    (cmds! (not (minibufferp)) #'company-complete-common)
+        :i "C-SPC"  (cmds! (not (minibufferp)) #'company-complete-common))
        (:after company
         (:map company-active-map
          "C-w"     nil  ; don't interfere with `evil-delete-backward-word'
@@ -162,13 +191,18 @@
       (:when (modulep! :completion corfu)
        (:after corfu
         (:map corfu-mode-map
-         :i "C-SPC" #'completion-at-point
+         (:unless (bound-and-true-p evil-disable-insert-state-bindings)
+          :i "C-@"   #'completion-at-point
+          :i "C-SPC" #'completion-at-point
+          :i "C-n"   #'+corfu/dabbrev-or-next
+          :i "C-p"   #'+corfu/dabbrev-or-last)
          :n "C-SPC" (cmd! (call-interactively #'evil-insert-state)
                           (call-interactively #'completion-at-point))
          :v "C-SPC" (cmd! (call-interactively #'evil-change)
                           (call-interactively #'completion-at-point)))
         (:map corfu-map
-         :i "C-SPC" #'corfu-insert-separator
+         (:unless (bound-and-true-p evil-disable-insert-state-bindings)
+          :i "C-SPC" #'corfu-insert-separator)
          "C-k" #'corfu-previous
          "C-j" #'corfu-next
          "C-u" (cmd! (let (corfu-cycle)
@@ -351,8 +385,9 @@
         :desc "New named workspace"       "N"   #'+workspace/new-named
         :desc "Load workspace from file"  "l"   #'+workspace/load
         :desc "Save workspace to file"    "s"   #'+workspace/save
-        :desc "Delete session"            "x"   #'+workspace/kill-session
-        :desc "Delete this workspace"     "d"   #'+workspace/delete
+        :desc "Kill session"              "x"   #'+workspace/kill-session
+        :desc "Kill this workspace"       "d"   #'+workspace/kill
+        :desc "Delete saved workspace"    "D"   #'+workspace/delete
         :desc "Rename workspace"          "r"   #'+workspace/rename
         :desc "Restore last session"      "R"   #'+workspace/restore-last-session
         :desc "Next workspace"            "]"   #'+workspace/switch-right
@@ -405,7 +440,7 @@
 
       ;;; <leader> c --- code
       (:prefix-map ("c" . "code")
-       (:when (and (modulep! :tools lsp) (not (modulep! :tools lsp +eglot)))
+       (:when (modulep! :tools lsp -eglot)
         :desc "LSP Execute code action"              "a"   #'lsp-execute-code-action
         :desc "LSP Organize imports"                 "o"   #'lsp-organize-imports
         :desc "LSP"                                  "l"   #'+default/lsp-command-map
@@ -456,6 +491,8 @@
        :desc "Browse emacs.d"              "E"   #'doom/browse-in-emacsd
        :desc "Find file"                   "f"   #'find-file
        :desc "Find file from here"         "F"   #'+default/find-file-under-here
+       (:when (modulep! :config literate)
+         :desc "Open heading in literate config" "h" #'+literate/find-heading)
        :desc "Locate file"                 "l"   #'locate
        :desc "Find file in private config" "p"   #'doom/find-file-in-private-config
        :desc "Browse private config"       "P"   #'doom/open-private-config
@@ -473,12 +510,10 @@
        :desc "Revert file"                 "R"   #'vc-revert
        :desc "Copy link to remote"         "y"   #'+vc/browse-at-remote-kill
        :desc "Copy link to homepage"       "Y"   #'+vc/browse-at-remote-kill-homepage
-       (:when (modulep! :ui hydra)
-        :desc "SMerge"                    "m"   #'+vc/smerge-hydra/body)
+       :desc "Git time machine"            "t"   #'git-timemachine-toggle
        (:when (modulep! :ui vc-gutter)
-        :desc "Revert hunk at point"      "r"   #'+vc-gutter/revert-hunk
-        :desc "stage hunk at point"       "s"   #'+vc-gutter/stage-hunk
-        :desc "Git time machine"          "t"   #'git-timemachine-toggle
+        :desc "Revert hunk at point"      "r"   #'+vc-gutter/save-and-revert-hunk
+        :desc "Stage hunk at point"       "s"   #'+vc-gutter/stage-hunk
         :desc "Jump to next hunk"         "]"   #'+vc-gutter/next-hunk
         :desc "Jump to previous hunk"     "["   #'+vc-gutter/previous-hunk)
        (:when (modulep! :tools magit)
@@ -494,7 +529,7 @@
         :desc "Magit fetch"               "F"   #'magit-fetch
         :desc "Magit buffer log"          "L"   #'magit-log-buffer-file
         :desc "Git stage this file"       "S"   #'magit-stage-buffer-file
-        :desc "Git unstage this file"     "U"   #'magit-unstage-file
+        :desc "Git unstage this file"     "U"   #'magit-unstage-buffer-file
         (:prefix ("f" . "find")
          :desc "Find file"                 "f"   #'magit-find-file
          :desc "Find gitconfig file"       "g"   #'magit-find-git-config-file
@@ -577,9 +612,10 @@
 
        :desc "Toggle last org-clock"        "c" #'+org/toggle-last-clock
        :desc "Cancel current org-clock"     "C" #'org-clock-cancel
-       :desc "Open deft"                    "d" #'deft
+       (:when (modulep! :ui deft)
+        :desc "Open deft"                   "d" #'deft)
        (:when (modulep! :lang org +noter)
-        :desc "Org noter"                  "e" #'org-noter)
+        :desc "Org noter"                   "e" #'org-noter)
 
        :desc "Find file in notes"           "f" #'+default/find-in-notes
        :desc "Browse notes"                 "F" #'+default/browse-notes
@@ -662,6 +698,10 @@
        (:when (modulep! :ui treemacs)
         :desc "Project sidebar" "p" #'+treemacs/toggle
         :desc "Find file in project sidebar" "P" #'treemacs-find-file)
+       (:when (modulep! :emacs dired +dirvish)
+        :desc "Open directory in dirvish"    "/" #'dirvish
+        :desc "Project sidebar"              "p" #'dirvish-side
+        :desc "Find file in project sidebar" "P" #'+dired/dirvish-side-and-follow)
        (:when (modulep! :term shell)
         :desc "Toggle shell popup"    "t" #'+shell/toggle
         :desc "Open shell here"       "T" #'+shell/here)
@@ -715,7 +755,6 @@
        :desc "Find recent project files"    "r" #'projectile-recentf
        :desc "Run project"                  "R" #'projectile-run-project
        :desc "Save project files"           "s" #'projectile-save-project-buffers
-       :desc "List project todos"           "t" #'magit-todos-list
        :desc "Test project"                 "T" #'projectile-test-project
        :desc "Pop up scratch buffer"        "x" #'doom/open-project-scratch-buffer
        :desc "Switch to scratch buffer"     "X" #'doom/switch-to-project-scratch-buffer
@@ -801,14 +840,14 @@
       (:prefix-map ("t" . "toggle")
        :desc "Big mode"                     "b" #'doom-big-font-mode
        :desc "Fill Column Indicator"        "c" #'global-display-fill-column-indicator-mode
+       :desc "Diff Highlights (Git Gutter)" "d" #'diff-hl-mode
        :desc "Flymake"                      "f" #'flymake-mode
-       (:when (and (modulep! :checkers syntax)
-                   (not (modulep! :checkers syntax +flymake)))
+       (:when (modulep! :checkers syntax -flymake)
         :desc "Flycheck"                   "f" #'flycheck-mode)
        :desc "Frame fullscreen"             "F" #'toggle-frame-fullscreen
        :desc "Evil goggles"                 "g" #'evil-goggles-mode
        (:when (modulep! :ui indent-guides)
-        :desc "Indent guides"              "i" #'highlight-indent-guides-mode)
+        :desc "Indent guides"              "i" #'indent-bars-mode)
        :desc "Indent style"                 "I" #'doom/toggle-indent-style
        :desc "Line numbers"                 "l" #'doom/toggle-line-numbers
        (:when (modulep! :ui minimap)
@@ -816,7 +855,7 @@
        (:when (modulep! :lang org +present)
         :desc "org-tree-slide mode"        "p" #'org-tree-slide-mode)
        :desc "Read-only mode"               "r" #'read-only-mode
-       (:when (and (modulep! :checkers spell) (not (modulep! :checkers spell +flyspell)))
+       (:when (modulep! :checkers spell -flyspell)
         :desc "Spell checker"              "s" #'spell-fu-mode)
        (:when (modulep! :checkers spell +flyspell)
         :desc "Spell checker"              "s" #'flyspell-mode)

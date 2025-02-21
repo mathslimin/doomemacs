@@ -18,7 +18,9 @@
 ;; Visit files opened outside of Emacs in existing frame, not a new one
 (setq ns-pop-up-frames nil)
 
-;; sane trackpad/mouse scroll settings
+;; Sane trackpad/mouse scroll settings. Also disables smooth scrolling because
+;; it's disturbingly clunky and slow without something like
+;; jdtsmith/ultra-scroll-mac.
 (setq mac-redisplay-dont-reset-vscroll t
       mac-mouse-wheel-smooth-scroll nil)
 
@@ -35,7 +37,7 @@
 
 ;; Delete files to trash on macOS, as an extra layer of precaution against
 ;; accidentally deleting wanted files.
-(setq delete-by-moving-to-trash t)
+(setq delete-by-moving-to-trash (not noninteractive))
 
 
 ;;

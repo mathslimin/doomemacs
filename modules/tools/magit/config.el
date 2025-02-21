@@ -84,6 +84,7 @@ Only has an effect in GUI Emacs.")
   ;; 2. The status screen isn't buried when viewing diffs or logs from the
   ;;    status screen.
   (setq transient-display-buffer-action '(display-buffer-below-selected)
+        transient-show-during-minibuffer-read t
         magit-display-buffer-function #'+magit-display-buffer-fn
         magit-bury-buffer-function #'magit-mode-quit-window)
   (set-popup-rule! "^\\(?:\\*magit\\|magit:\\| \\*transient\\*\\)" :ignore t)
@@ -153,7 +154,7 @@ Only has an effect in GUI Emacs.")
   ;; All forge list modes are derived from `forge-topic-list-mode'
   (map! :map forge-topic-list-mode-map :n "q" #'kill-current-buffer)
   (when (not forge-add-default-bindings)
-    (map! :map magit-mode-map [remap magit-browse-thing] #'forge-browse-dwim
+    (map! :map magit-mode-map [remap magit-browse-thing] #'forge-browse
           :map magit-remote-section-map [remap magit-browse-thing] #'forge-browse-remote
           :map magit-branch-section-map [remap magit-browse-thing] #'forge-browse-branch))
   (set-popup-rule! "^\\*?[0-9]+:\\(?:new-\\|[0-9]+$\\)" :size 0.45 :modeline t :ttl 0 :quit nil)
@@ -181,13 +182,6 @@ Only has an effect in GUI Emacs.")
   (after! forge
     (transient-append-suffix 'forge-dispatch "c u"
       '("c r" "Review pull request" +magit/start-code-review))))
-
-
-(use-package! magit-todos
-  :after magit
-  :config
-  (setq magit-todos-keyword-suffix "\\(?:([^)]+)\\)?:?") ; make colon optional
-  (define-key magit-todos-section-map "j" nil))
 
 
 (use-package! evil-collection-magit
@@ -227,7 +221,10 @@ Only has an effect in GUI Emacs.")
         (:map magit-status-mode-map
          :nv "gz" #'magit-refresh)
         (:map magit-diff-mode-map
-         :nv "gd" #'magit-jump-to-diffstat-or-diff))
+         :nv "gd" #'magit-jump-to-diffstat-or-diff)
+        ;; Don't open recursive process buffers
+        (:map magit-process-mode-map
+         :nv "`" #'ignore))
 
   ;; A more intuitive behavior for TAB in magit buffers:
   (define-key! 'normal
@@ -259,3 +256,24 @@ Only has an effect in GUI Emacs.")
     (undefine-key! magit-section-mode-map "M-1" "M-2" "M-3" "M-4" "1" "2" "3" "4" "0")
     ;; `evil-collection-magit-section' binds these redundant keys.
     (map! :map magit-section-mode-map :n "1" nil :n "2" nil :n "3" nil :n "4" nil)))
+
+
+(use-package! git-commit
+  :hook (doom-first-file . global-git-commit-mode)
+  :config
+  (set-yas-minor-mode! 'git-commit-mode)
+
+  ;; Enforce git commit conventions.
+  ;; See https://chris.beams.io/posts/git-commit/
+  (setq git-commit-summary-max-length 50
+        git-commit-style-convention-checks '(overlong-summary-line non-empty-second-line))
+  (setq-hook! 'git-commit-mode-hook fill-column 72)
+
+  (add-hook! 'git-commit-setup-hook
+    (defun +vc-start-in-insert-state-maybe-h ()
+      "Start git-commit-mode in insert state if in a blank commit message,
+otherwise in default state."
+      (when (and (bound-and-true-p evil-local-mode)
+                 (not (evil-emacs-state-p))
+                 (bobp) (eolp))
+        (evil-insert-state)))))
