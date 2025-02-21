@@ -56,7 +56,7 @@
 
   (setq js-chain-indent t
         ;; These have become standard in the JS community
-        js2-basic-offset 2
+        js2-basic-offset 4
         ;; Don't mishighlight shebang lines
         js2-skip-preprocessor-directives t
         ;; let flycheck handle this
